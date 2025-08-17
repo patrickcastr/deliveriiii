@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.dist
+.pnp.cjs
+.pnp.loader.mjs
+.next
+build/
+coverage/
+.env*
+**/.turbo
+.vscode/.history
+.lhci/

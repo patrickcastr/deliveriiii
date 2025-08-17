@@ -1,0 +1,37 @@
+{
+  "title": "DeliveryApp API Metrics",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "HTTP RPS",
+      "targets": [{ "expr": "sum(rate(http_requests_total[1m]))" }]
+    },
+    {
+      "type": "graph",
+      "title": "HTTP 5xx Errors",
+      "targets": [{ "expr": "sum(rate(http_request_errors_total[1m]))" }]
+    },
+    {
+      "type": "graph",
+      "title": "Request Duration (p95)",
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))" }]
+  },
+  {
+        "type": "stat",
+        "title": "Error Rate (5m)",
+        "targets": [{ "expr": "(sum(rate(http_request_errors_total[5m])) / sum(rate(http_requests_total[5m]))) * 100" }],
+        "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto" },
+        "fieldConfig": { "defaults": { "unit": "percent", "decimals": 2 } }
+      },
+      {
+        "type": "stat",
+        "title": "p95 Latency (s)",
+        "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))" }],
+        "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto" },
+        "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } }
+  }
+  ],
+  "schemaVersion": 37,
+  "version": 1
+}

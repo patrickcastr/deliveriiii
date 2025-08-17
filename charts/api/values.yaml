@@ -1,0 +1,10 @@
+replicaCount: 1
+image:
+  repository: your-registry/deliveryapp-api
+  tag: latest
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  port: 80
+resources: {}
+env: {}

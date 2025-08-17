@@ -1,0 +1,150 @@
+openapi: 3.1.0
+info:
+  title: DeliveryApp API
+  version: 0.1.0
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/v1/packages:
+    get:
+      summary: List packages
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, picked_up, in_transit, delivered, failed] }
+        - in: query
+          name: driverId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create package
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                barcode: { type: string }
+                status: { type: string, enum: [pending, picked_up, in_transit, delivered, failed] }
+                recipient: { type: object }
+                driverId: { type: string, format: uuid }
+                location: { type: object, properties: { lat: { type: number }, lng: { type: number } } }
+                metadata: { type: object }
+      responses:
+        '201': { description: Created }
+  /api/v1/packages/{id}:
+    get:
+      summary: Get package
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '404': { description: Not Found }
+    put:
+      summary: Update package
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200': { description: OK }
+    delete:
+      summary: Delete package
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: No Content }
+  /api/v1/scan:
+    post:
+      summary: Scan event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                barcode: { type: string }
+                stage: { type: string, enum: [package_scanned, status_updated, location_changed, delivery_completed] }
+                gps: { type: object, properties: { lat: { type: number }, lng: { type: number } } }
+                deviceInfo: { type: object }
+      responses:
+        '200': { description: OK }
+  /api/v1/scan/history:
+    get:
+      summary: Scan history
+      parameters:
+        - in: query
+          name: packageId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+      responses:
+        '200': { description: OK }
+  /api/v1/audit:
+    get:
+      summary: Audit list
+      parameters:
+        - in: query
+          name: package_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+      responses:
+        '200': { description: OK }
+  /api/v1/audit/export:
+    post:
+      summary: Export audit
+      responses:
+        '200': { description: OK }
+  /api/v1/packages/{id}/attachments/sign:
+    post:
+      summary: Presign upload
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/v1/packages/{id}/attachments:
+    get:
+      summary: List attachments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }

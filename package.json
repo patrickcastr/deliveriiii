@@ -1,0 +1,39 @@
+{
+  "name": "deliveryapp",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @deliveryapp/web dev",
+    "dev:api": "pnpm --filter @deliveryapp/api dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "format": "prettier -w .",
+    "prepare": "husky install",
+    "postinstall": "pnpm --filter @deliveryapp/api generate || true",
+    "db:migrate": "pnpm --filter @deliveryapp/api db:migrate",
+    "db:seed": "pnpm --filter @deliveryapp/api db:seed",
+    "audit": "pnpm -r audit --prod",
+    "lh:ci": "pnpm --filter @deliveryapp/web preview --port 4173 --strictPort & wait-on http://localhost:4173 && lhci autorun --config=lighthouserc.json || (taskkill /F /IM node.exe & exit 1)"
+  },
+  "devDependencies": {
+    "@lhci/cli": "^0.15.1",
+    "@types/node": "^20.12.7",
+    "@typescript-eslint/eslint-plugin": "^7.8.0",
+    "@typescript-eslint/parser": "^7.8.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "eslint-plugin-react": "^7.34.1",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.2",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.5",
+    "wait-on": "^8.0.4"
+  }
+}

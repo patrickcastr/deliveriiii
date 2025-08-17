@@ -1,0 +1,11 @@
+{
+  "server": "https://www.webpagetest.org/",
+  "location": "Dulles_MotoG7",
+  "runs": 3,
+  "firstViewOnly": true,
+  "video": true,
+  "timeline": true,
+  "private": true,
+  "lighthouse": true,
+  "script": "navigate http://localhost:4173/"
+}

@@ -1,0 +1,21 @@
+{
+  "title": "DeliveryApp Socket Metrics",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Active WS Connections (/ and /rt)",
+      "targets": [
+        { "expr": "sum(ws_connections{namespace='/'})" },
+        { "expr": "sum(ws_connections{namespace='/rt'})" }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "WS Connections Total",
+      "targets": [{ "expr": "sum(increase(ws_connections_total[5m]))" }]
+    }
+  ],
+  "schemaVersion": 37,
+  "version": 1
+}

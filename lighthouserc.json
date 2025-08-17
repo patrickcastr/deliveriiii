@@ -1,0 +1,24 @@
+{
+  "ci": {
+    "collect": {
+      "staticDistDir": "apps/web/dist",
+      "url": [
+        "http://localhost:4173/",
+        "http://localhost:4173/driver",
+        "http://localhost:4173/admin"
+      ],
+      "settings": {
+        "preset": "mobile",
+        "throttlingMethod": "devtools",
+        "formFactor": "mobile"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "metrics/first-contentful-paint": ["warn", {"maxNumericValue": 1500}],
+        "metrics/largest-contentful-paint": ["error", {"maxNumericValue": 2500}],
+        "cumulative-layout-shift": ["error", {"maxNumericValue": 0.1}]
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "DeliveryApp",
+  "short_name": "Delivery",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0ea5e9",
+  "icons": []
+}

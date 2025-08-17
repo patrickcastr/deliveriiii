@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  manager
+  driver
+  viewer
+}
+
+enum PackageStatus {
+  pending
+  picked_up
+  in_transit
+  delivered
+  failed
+}
+
+enum DeliveryEventType {
+  package_scanned
+  status_updated
+  location_changed
+  delivery_completed
+}
+
+enum DeliveryEventSource {
+  scanner
+  manual
+  system
+}
+
+model User {
+  id           String      @id @default(cuid())
+  name         String?
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  role         UserRole
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  // relations
+  packages     Package[]   @relation("DriverPackages")
+  auditEntries AuditEntry[]
+}
+
+model Package {
+  id           String          @id @default(cuid())
+  barcode      String          @unique
+  status       PackageStatus
+  locationLat  Float?          @map("location_lat")
+  locationLng  Float?          @map("location_lng")
+  recipient    Json            // { name, phone, email, address }
+  metadata     Json?
+  createdAt    DateTime        @default(now()) @map("created_at")
+  lastUpdated  DateTime        @updatedAt @map("last_updated")
+  deliveredAt  DateTime?       @map("delivered_at")
+
+  // driver assignment
+  driverId     String?         @map("driver_id")
+  driver       User?           @relation("DriverPackages", fields: [driverId], references: [id])
+
+  // relations
+  auditEntries AuditEntry[]
+  events       DeliveryEvent[]
+  attachments  Attachment[]
+
+  @@index([status])
+  @@index([driverId, status])
+}
+
+model AuditEntry {
+  id            String    @id @default(cuid())
+  timestamp     DateTime  @default(now())
+  action        String
+  userId        String    @map("user_id")
+  packageId     String    @map("package_id")
+  locationLat   Float?    @map("location_lat")
+  locationLng   Float?    @map("location_lng")
+  deviceInfo    Json      @map("device_info")
+  previousState Json?     @map("previous_state")
+  newState      Json?     @map("new_state")
+  signature     Json?
+
+  user          User      @relation(fields: [userId], references: [id])
+  package       Package   @relation(fields: [packageId], references: [id])
+
+  @@index([packageId])
+  @@index([timestamp])
+}
+
+model DeliveryEvent {
+  id         String               @id @default(cuid())
+  type       DeliveryEventType
+  payload    Json
+  timestamp  DateTime             @default(now())
+  source     DeliveryEventSource
+  packageId  String               @map("package_id")
+
+  package    Package              @relation(fields: [packageId], references: [id])
+
+  @@index([packageId])
+  @@index([timestamp])
+}
+
+model Attachment {
+  id          String    @id @default(cuid())
+  packageId   String    @map("package_id")
+  key         String
+  bucket      String
+  contentType String     @map("content_type")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  package     Package   @relation(fields: [packageId], references: [id])
+
+  @@index([packageId])
+  @@index([createdAt])
+}

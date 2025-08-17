@@ -1,0 +1,13 @@
+ARG NODE_VERSION=20
+FROM node:${NODE_VERSION}-alpine AS base
+WORKDIR /repo
+COPY . .
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm i --frozen-lockfile && pnpm -r build
+
+FROM node:${NODE_VERSION}-alpine
+WORKDIR /app
+COPY --from=base /repo/apps/api/dist ./dist
+COPY --from=base /repo/apps/api/package.json ./package.json
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm i --prod --frozen-lockfile || true
+EXPOSE 3000
+CMD ["node", "dist/index.js"]

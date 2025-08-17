@@ -1,0 +1,21 @@
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    env_file:
+      - ./apps/api/.env.example
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
