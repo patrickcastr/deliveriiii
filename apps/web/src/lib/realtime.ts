@@ -15,7 +15,21 @@ function emitChange() {
 
 export function getSocket(baseUrl = '') {
   if (socket) return socket;
-  socket = io(`${baseUrl}/rt`, {
+  // Determine base: explicit param > VITE_API_WS > derived from VITE_API_BASE > same-origin
+  let base = baseUrl;
+  if (!base) {
+    const env: any = import.meta.env as any;
+    const apiWs: string | undefined = env?.VITE_API_WS;
+    const apiBase: string | undefined = env?.VITE_API_BASE;
+    if (apiWs) base = apiWs.replace(/\/$/, '');
+    else if (apiBase) {
+      try {
+        const u = new URL(apiBase);
+        base = `${u.protocol === 'https:' ? 'wss' : 'ws'}://${u.host}`;
+      } catch {}
+    }
+  }
+  socket = io(`${base}/rt`, {
     withCredentials: true,
     transports: ['websocket'],
     reconnection: true,
@@ -62,6 +76,8 @@ export function getSocket(baseUrl = '') {
 }
 
 export function useRealtimePackage(packageId: string, baseUrl = '') {
+  // memoized snapshot per package id
+  const lastPkgSnapshot = useRef<{ connected: boolean; lastPong: number; data: any } | null>(null);
   const s = useSyncExternalStore(
     (cb) => {
       subscribers.add(cb);
@@ -69,11 +85,18 @@ export function useRealtimePackage(packageId: string, baseUrl = '') {
       sock.emit('join:package', packageId);
       return () => subscribers.delete(cb);
     },
-    () => ({
-      connected: state.connected,
-      lastPong: state.lastPong,
-      data: state.packages.get(packageId),
-    }),
+    () => {
+      const next = {
+        connected: state.connected,
+        lastPong: state.lastPong,
+        data: state.packages.get(packageId),
+      } as const;
+      const prev = lastPkgSnapshot.current;
+      if (!prev || prev.connected !== next.connected || prev.lastPong !== next.lastPong || prev.data !== next.data) {
+        lastPkgSnapshot.current = { ...next } as any;
+      }
+      return lastPkgSnapshot.current as any;
+    },
   );
   return s;
 }
@@ -87,12 +110,21 @@ export function useRealtimeRoleRoom(role: 'admin' | 'manager' | 'driver' | 'view
       ref.current.joined = true;
     }
   }, [role, id, baseUrl]);
+  // memoize snapshot for role room
+  const lastRoleSnapshot = useRef<{ connected: boolean; lastPong: number } | null>(null);
   const s = useSyncExternalStore(
     (cb) => {
       subscribers.add(cb);
       return () => subscribers.delete(cb);
     },
-    () => ({ connected: state.connected, lastPong: state.lastPong }),
+    () => {
+      const next = { connected: state.connected, lastPong: state.lastPong } as const;
+      const prev = lastRoleSnapshot.current;
+      if (!prev || prev.connected !== next.connected || prev.lastPong !== next.lastPong) {
+        lastRoleSnapshot.current = { ...next };
+      }
+      return lastRoleSnapshot.current as any;
+    },
   );
   return s;
 }

@@ -4,7 +4,11 @@ export const config = {
   env: process.env.NODE_ENV || 'development',
   isProd: (process.env.NODE_ENV || 'development') === 'production',
   port: Number(process.env.PORT || 3000),
-  webOrigin: process.env.WEB_ORIGIN || 'http://localhost:5173',
+  webOrigin:
+    process.env.WEB_ORIGIN ||
+    process.env.CORS_ORIGIN ||
+    process.env.PUBLIC_WEB_ORIGIN ||
+    'http://localhost:5173',
   ipAllowlistCidrs: (process.env.IP_ALLOWLIST_CIDRS || '')
     .split(',')
     .map((s) => s.trim())

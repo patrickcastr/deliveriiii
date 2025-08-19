@@ -58,6 +58,100 @@ pnpm dev:api
 pnpm dev:web
 ```
 
+## Remote run over HTTPS + Live Preview (Windows PowerShell)
+
+Goal: run web and API locally and expose a single public HTTPS URL that proxies `/api/*` to the API and supports WebSockets for realtime and camera access.
+
+1) Start backing services
+
+```powershell
+docker compose up -d
+```
+
+2) Migrate + seed database
+
+```powershell
+pnpm db:migrate
+pnpm db:seed
+```
+
+3) Run API and Web (two terminals)
+
+Terminal A (API):
+
+```powershell
+$env:NODE_ENV = 'development'
+$env:WEB_ORIGIN = 'http://localhost:5173'   # will update to tunnel URL later
+$env:CSRF_ENABLED = 'true'
+$env:DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/deliveryapp?schema=public'
+$env:REDIS_URL = 'redis://localhost:6379'
+pnpm dev:api
+# API on http://localhost:3000
+```
+
+Terminal B (Web):
+
+```powershell
+pnpm dev:web -- --host
+# Web on http://localhost:5173
+```
+
+Vite is configured to proxy `/api/*` and `/socket.io` to `http://localhost:3000`, so the web app can call relative paths and use same-origin WebSockets when tunneled.
+
+4) Expose with HTTPS (choose one)
+
+- Cloudflare Tunnel (recommended):
+	- Install cloudflared and login: `cloudflared tunnel login`
+	- Quick temp URL: `cloudflared tunnel --url http://localhost:5173`
+		- Copy the printed `https://*.trycloudflare.com` and set it as the public origin.
+	- Or create a named tunnel and DNS route to your domain following Cloudflare docs.
+
+- ngrok (fastest):
+	- `ngrok config add-authtoken <YOUR_TOKEN>`
+	- Expose web: `ngrok http 5173 --host-header=rewrite`
+	- Expose API (second ngrok): `ngrok http 3000 --host-header=rewrite`
+
+5) Wire env to the public URL
+
+If using a single origin (Cloudflare with path routing `/api/*`):
+
+```powershell
+# In API terminal, stop and restart with:
+$env:WEB_ORIGIN = 'https://<your-public-host>'
+pnpm dev:api
+
+# In web terminal, if needed (custom API origin):
+# $env:VITE_API_BASE = 'https://<your-public-host>/api'
+# Restart web dev server if you set envs.
+```
+
+If using two ngrok URLs, set on the web side:
+
+```powershell
+$env:VITE_API_BASE = 'https://<api-public-host>'
+pnpm dev:web -- --host
+```
+
+6) Verify Socket.IO
+
+- In browser DevTools → Network, the `socket.io/` request should upgrade to WebSocket (not long-polling).
+- Realtime updates should reflect within ~200ms.
+
+7) Acceptance checklist
+
+- Open the public HTTPS URL on mobile; PWA install prompt appears.
+- Camera permission granted; scanner opens; first decode < 1s.
+- Two browsers (admin + driver) show realtime scan status changes.
+- `/api/metrics` is accessible locally at `http://localhost:3000/metrics`; do not route it publicly in your tunnel.
+- Lighthouse (local): `pnpm lh:ci` meets budgets (FCP < 1.5s, LCP < 2.5s, CLS < 0.1).
+
+8) Stop
+
+```powershell
+# Stop tunnels: Ctrl+C in tunnel terminals
+docker compose down
+```
+
 Endpoints:
 - API Swagger UI: `http://localhost:3000/docs`
 - API health: `http://localhost:3000/healthz`
@@ -106,4 +200,31 @@ Monitoring:
 
 Security:
 - See `SECURITY.md` for posture and STRIDE-lite model.
+
+## Admin Item Templates and Dynamic Metadata
+
+Admins can define reusable "Item Templates" that enforce custom fields on package creation.
+
+- Create/edit under Web → Admin → Templates → Item Templates.
+- A template has a JSON schema (v1) describing fields like select, checkbox, number, textarea, date, phone, email, photo-count, and signature-toggle, each with id, label, required, and extras.
+- Publish the template to make it selectable in the New Package dialog.
+- The Admin → New Package form lets you pick a published template; dynamic fields render inline. On submit, the API validates `metadata` against the template. If invalid, the server returns 422 with per-field errors which the UI maps to each field.
+
+Seed data includes a published template "Standard Intake" so you can try this out immediately after `pnpm db:seed`.
+
+### E2E quickstart (Cypress)
+
+Prereqs: dev servers running (web on 5173, api on 3000), DB seeded.
+
+```powershell
+# from repo root
+pnpm --filter @deliveryapp/web i  # ensure cypress is installed in web package
+pnpm --filter @deliveryapp/web e2e:open
+```
+
+This opens Cypress. Run the spec "new-package-item-template.cy.ts". The test:
+- Opens Admin dashboard, clicks New.
+- Selects "Standard Intake" template.
+- Submits with missing required metadata to trigger server validation.
+- Fixes the field and submits successfully.
 

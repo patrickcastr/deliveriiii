@@ -35,6 +35,12 @@ enum DeliveryEventSource {
   system
 }
 
+enum PackageFormStatus {
+  draft
+  published
+  archived
+}
+
 model User {
   id           String      @id @default(cuid())
   name         String?
@@ -50,12 +56,16 @@ model User {
 }
 
 model Package {
-  id           String          @id @default(cuid())
+  id           String          @id @default(uuid())
   barcode      String          @unique
   status       PackageStatus
   locationLat  Float?          @map("location_lat")
   locationLng  Float?          @map("location_lng")
-  recipient    Json            // { name, phone, email, address }
+  // Recipient fields (flattened)
+  recipientName   String
+  recipientPhone  String?
+  recipientEmail  String?
+  recipientAddress String
   metadata     Json?
   createdAt    DateTime        @default(now()) @map("created_at")
   lastUpdated  DateTime        @updatedAt @map("last_updated")
@@ -65,6 +75,15 @@ model Package {
   driverId     String?         @map("driver_id")
   driver       User?           @relation("DriverPackages", fields: [driverId], references: [id])
 
+  // requirements
+  requirementTemplateId String?
+  requirementTemplate   PackageRequirementTemplate? @relation(fields: [requirementTemplateId], references: [id])
+  checklist             PackageChecklist?
+
+  // optional item template link (renamed from form template)
+  itemTemplateId String?                 @map("item_template_id")
+  itemTemplate   PackageItemTemplate?    @relation(fields: [itemTemplateId], references: [id])
+
   // relations
   auditEntries AuditEntry[]
   events       DeliveryEvent[]
@@ -72,6 +91,48 @@ model Package {
 
   @@index([status])
   @@index([driverId, status])
+}
+
+model PackageRequirementTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  rules       Json
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // relations
+  checklists  PackageChecklist[]
+  packages    Package[]
+}
+
+model PackageChecklist {
+  id         String   @id @default(uuid())
+  packageId  String   @unique
+  templateId String
+  rulesHash  String
+  progress   Json
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  package   Package                      @relation(fields: [packageId], references: [id])
+  template  PackageRequirementTemplate   @relation(fields: [templateId], references: [id])
+}
+
+model PackageItemTemplate {
+  id           String             @id @default(uuid())
+  name         String
+  description  String?
+  status       PackageFormStatus  @default(draft)
+  schema       Json
+  createdById  String             @map("created_by_id")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  // relations
+  packages     Package[]
 }
 
 model AuditEntry {

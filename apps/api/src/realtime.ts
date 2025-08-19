@@ -21,12 +21,25 @@ const roomPackage = (pkgId: string) => `package:${pkgId}`;
 let ioRt: ReturnType<Server['of']> | null = null;
 
 export function initRealtime(io: Server, redisUrl: string) {
-  // Redis adapter for horizontal scale
-  const pub = new Redis(redisUrl);
-  const sub = new Redis(redisUrl);
+  // Try to enable Redis adapter; skip if unavailable in dev
+  try {
+    const opts = { maxRetriesPerRequest: 0, enableOfflineQueue: false, lazyConnect: true } as const;
+    const pub = new Redis(redisUrl, opts);
+    const sub = new Redis(redisUrl, opts);
+    pub.on('error', () => {/* swallow in dev */});
+    sub.on('error', () => {/* swallow in dev */});
+    // Connect and only attach adapter if both succeed
+    Promise.allSettled([pub.connect(), sub.connect()]).then((results) => {
+      const ok = results.every((r) => r.status === 'fulfilled');
+      if (ok) {
+        (io as any).adapter(createAdapter(pub, sub));
+      }
+    }).catch(() => {/* ignore */});
+  } catch {
+    // no-op: continue without Redis adapter
+  }
 
   ioRt = io.of('/rt');
-  (ioRt as any).adapter(createAdapter(pub, sub));
 
   // Heartbeat and buffer limits are set at Server creation in index.ts
 

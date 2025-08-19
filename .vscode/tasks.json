@@ -1,0 +1,27 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "dev:api",
+			"type": "shell",
+			"command": "pnpm --filter @deliveryapp/api dev",
+			"problemMatcher": [
+				"$tsc",
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Install workspace dependencies",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"install"
+			],
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		}
+	]
+}

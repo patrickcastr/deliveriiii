@@ -8,7 +8,9 @@
     "build": "vite build",
   "preview": "vite preview",
   "lh:ci": "vite preview --port 4173 --strictPort & wait-on http://localhost:4173 && lhci autorun --config=../../lighthouserc.json || (taskkill /F /IM node.exe & exit 1)",
-    "lint": "eslint src --ext .ts,.tsx"
+  "lint": "eslint src --ext .ts,.tsx",
+  "e2e": "cypress run",
+  "e2e:open": "cypress open"
   },
   "dependencies": {
   "@deliveryapp/shared": "workspace:*",
@@ -22,7 +24,9 @@
   "tailwind-merge": "^2.3.0",
   "@radix-ui/react-slot": "^1.0.2",
   "@zxing/browser": "^0.1.5",
-  "@zxing/library": "^0.21.3"
+  "@zxing/library": "^0.21.3",
+  "react-hook-form": "^7.53.0",
+  "@hookform/resolvers": "^3.9.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",
@@ -32,6 +36,7 @@
     "postcss": "^8.4.38",
   "tailwindcss": "^3.4.3",
   "tailwindcss-animate": "^1.0.7",
+  "cypress": "^13.12.0",
     "typescript": "^5.4.5",
     "vite": "^5.2.0"
   }

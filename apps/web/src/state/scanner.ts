@@ -3,7 +3,7 @@ import { create } from 'zustand';
 export interface ScannerConfig {
   supportedFormats: Array<'QR_CODE'|'CODE_128'|'CODE_39'|'EAN_13'|'UPC_A'>;
   camera: { facingMode: 'environment'|'user'; resolution: 'HD'|'FHD' };
-  scanning: { continuous: boolean; timeout: number; beepOnSuccess: boolean };
+  scanning: { continuous: boolean; timeout: number; beepOnSuccess: boolean; hapticOnSuccess: boolean };
 }
 
 interface ScannerState {
@@ -23,7 +23,7 @@ export const useScannerStore = create<ScannerState>((set) => ({
   config: {
     supportedFormats: ['QR_CODE','CODE_128','CODE_39','EAN_13','UPC_A'],
     camera: { facingMode: 'environment', resolution: 'HD' },
-    scanning: { continuous: true, timeout: 0, beepOnSuccess: true },
+  scanning: { continuous: true, timeout: 0, beepOnSuccess: true, hapticOnSuccess: true },
   },
   setActive: (v) => set({ active: v }),
   setLastResult: (text) => set({ lastResult: text }),

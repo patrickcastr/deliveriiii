@@ -8,7 +8,7 @@ import rateLimit from '@fastify/rate-limit';
 import { Server, type Socket } from 'socket.io';
 import { ZodError, z } from 'zod';
 import { PrismaClient, UserRole } from '@prisma/client';
-import Redis from 'ioredis';
+import { createRedis } from './redis';
 import { Client as ElasticClient } from '@elastic/elasticsearch';
 import type { Health } from '@deliveryapp/shared';
 import { config } from './config';
@@ -22,6 +22,8 @@ import v1Packages from './routes/v1/packages';
 import v1Scan from './routes/v1/scan';
 import v1Audit from './routes/v1/audit';
 import v1Attachments from './routes/v1/attachments';
+import v1Requirements from './routes/v1/requirements';
+import v1Items from './routes/v1/items';
 import { initRealtime } from './realtime';
 import { metricsHandler, onRequestHook, onResponseHook } from './metrics';
 import { dbQueryDuration } from './metrics';
@@ -30,6 +32,7 @@ import { config as appConfig } from './config';
 import CIDR from 'ip-cidr';
 import net from 'node:net';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 const prisma = new PrismaClient();
 // Prisma query timing middleware
@@ -47,14 +50,21 @@ prisma.$use(async (params, next) => {
     }
   }
 });
-const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
+const redis = createRedis(process.env.REDIS_URL || null);
 const es = new ElasticClient({ node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200' });
 
 const app = Fastify({
   genReqId: (req) => (req?.headers?.['x-request-id'] as string | undefined) || crypto.randomUUID(),
   logger: {
     level: 'info',
-    redact: ['req.headers.authorization', 'req.headers.cookie', 'headers.authorization', 'headers.cookie', 'res.headers.set-cookie', 'response.headers.set-cookie'],
+    redact: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'headers.authorization',
+      'headers.cookie',
+      'res.headers["set-cookie"]',
+      'response.headers["set-cookie"]',
+    ],
   },
 });
 // Metrics hooks
@@ -77,6 +87,14 @@ await app.register(helmet, {
       scriptSrc: ["'self'", `'nonce-${CSP_NONCE}'`],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
+      connectSrc: [
+        "'self'",
+        'http://localhost:5173',
+        'ws://localhost:5173',
+        'ws:',
+        'wss:',
+        'http://localhost:3000',
+      ],
     },
   },
 });
@@ -86,8 +104,8 @@ await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
 await app.register(swagger, {
   mode: 'static',
   specification: {
-    path: new URL('../openapi.yaml', import.meta.url).pathname,
-    baseDir: new URL('.', import.meta.url).pathname,
+    path: fileURLToPath(new URL('./openapi.yaml', import.meta.url)),
+    baseDir: fileURLToPath(new URL('./', import.meta.url)),
   },
 });
 await app.register(swaggerUI, { routePrefix: '/docs' });
@@ -107,6 +125,8 @@ await app.register(v1Packages, { prefix: '/api/v1' });
 await app.register(v1Scan, { prefix: '/api/v1' });
 await app.register(v1Audit, { prefix: '/api/v1' });
 await app.register(v1Attachments, { prefix: '/api/v1' });
+await app.register(v1Requirements, { prefix: '/api/v1' });
+await app.register(v1Items, { prefix: '/api/v1' });
 
 app.get('/healthz', async (): Promise<Health> => {
   // Lightweight pings (best-effort)

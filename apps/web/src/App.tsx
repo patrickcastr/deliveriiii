@@ -2,7 +2,11 @@ import React from 'react';
 import { io } from 'socket.io-client';
 import { Button } from './components/ui/button';
 
-const socket = io(import.meta.env.VITE_API_WS || 'ws://localhost:3000');
+// Prefer same-origin websocket to /rt namespace; fall back to localhost for local dev
+const defaultWs = typeof window !== 'undefined'
+  ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/rt`
+  : 'ws://localhost:3000/rt';
+const socket = io(import.meta.env.VITE_API_WS || defaultWs, { withCredentials: true, transports: ['websocket'] });
 
 export default function App() {
   const [message, setMessage] = React.useState('');

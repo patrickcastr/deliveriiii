@@ -71,3 +71,5 @@ export interface AttachmentDTO {
   contentType: string;
   created_at: string;
 }
+
+export * from './forms';
