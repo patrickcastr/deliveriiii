@@ -6,4 +6,4 @@ COPY . .
 RUN pnpm i --frozen-lockfile || pnpm i
 RUN pnpm build
 EXPOSE 3000
-CMD ["node", "dist/index.js"]
+CMD ["pnpm", "start"]

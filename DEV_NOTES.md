@@ -1,3 +1,8 @@
+- Iteration X: Improved Item Templates UI — hidden JSON editor, auto-increment field IDs, schema built automatically from UI fields.
+
+Iteration: Bound Fastify to 0.0.0.0, added/verified /healthz, updated env example and dev script.
+
+Iteration: Fixed hanging templates route — DB dockerized, Prisma migrated, handlers made defensive with error logs; added /healthz/db.
 # Developer Iteration Notes — Agent5 (Deliveriii)
 
 This journal captures design decisions, tradeoffs, and implementation details across iterations.
@@ -254,4 +259,12 @@ cess sheet: “Scanned • PKG-XXXX” with primary action “Update status” a
 - Added `.github/workflows/ci.yml` to build the monorepo (Node 20, pnpm 9, frozen lockfile, recursive build).
 - Configured CI to run on push and pull_request events.
 - Pushed repository to GitHub remote `patrickcastr/deliveriiii`.
+
+## Iteration XX: API bound to 0.0.0.0, vite proxy validated, added /healthz
+
+- Fastify now listens on `{ host: '0.0.0.0', port: PORT }` (PORT defaults to 3000). Startup log prints `http://localhost:PORT`.
+- Added `/healthz` that returns `{ ok: true }` for readiness checks; tolerant of optional deps (Redis/DB/ES) in dev.
+- Vite proxy confirmed for `/api` and `/socket.io` to `http://localhost:3000` with error logging on proxy failures.
+- Added `.env.example` (API_HOST, API_PORT, VITE_API_URL, DATABASE_URL, REDIS_URL, ELASTICSEARCH_NODE, JWT secrets).
+- API Dockerfile exposes 3000 and uses `CMD ["pnpm", "start"]`.
 

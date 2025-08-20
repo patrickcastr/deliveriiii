@@ -6,11 +6,9 @@ type Template = { id: string; name: string; description?: string; status: 'draft
 type FormInputs = {
   name: string;
   description?: string;
-  schemaText: string;
 };
 
 type FieldInputs = {
-  id: string;
   label: string;
   type: 'text'|'textarea'|'number'|'select'|'checkbox'|'date'|'phone'|'email'|'photo-count'|'signature-toggle';
   required?: boolean;
@@ -30,8 +28,23 @@ function pretty(obj: any) {
   return JSON.stringify(obj, null, 2);
 }
 
-function defaultSchema() {
-  return pretty({ version: 1, fields: [] });
+function defaultSchema() { return pretty({ version: 1, fields: [] }); }
+
+function nextFieldId(existing: Array<{ id: string }>): string {
+  const used = new Set(existing.map((f) => f.id));
+  // find max numeric suffix for ids matching field<number>
+  let max = 0;
+  for (const id of used) {
+    const m = /^field(\d+)$/.exec(id);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  let n = max + 1;
+  let candidate = `field${n}`;
+  while (used.has(candidate)) {
+    n += 1;
+    candidate = `field${n}`;
+  }
+  return candidate;
 }
 
 export default function AdminItems() {
@@ -39,15 +52,18 @@ export default function AdminItems() {
   const [selected, setSelected] = React.useState<Template | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  // internal field list state for schema building
+  const [fields, setFields] = React.useState<any[]>([]);
 
-  const { register, handleSubmit, reset, getValues, setValue, formState: { isDirty } } = useForm<FormInputs>({
-    defaultValues: { name: '', description: '', schemaText: defaultSchema() },
+  const { register, handleSubmit, reset } = useForm<FormInputs>({
+    defaultValues: { name: '', description: '' },
   });
   const fieldForm = useForm<FieldInputs>({ defaultValues: { type: 'text', required: false } });
 
   React.useEffect(() => { void load(); }, []);
+  const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
   async function load() {
-    const res = await fetch('/api/v1/items/templates', { credentials: 'include' });
+    const res = await fetch(`${API_BASE}/api/v1/items/templates`, { credentials: 'include' });
     if (res.ok) {
       const data = await res.json();
       setItems(data.items || []);
@@ -56,23 +72,23 @@ export default function AdminItems() {
 
   function openNew() {
     setSelected(null);
-    reset({ name: '', description: '', schemaText: defaultSchema() });
+    setFields([]);
+    reset({ name: '', description: '' });
   }
 
   function openEdit(t: Template) {
     setSelected(t);
-    reset({ name: t.name, description: t.description ?? '', schemaText: pretty(t.schema ?? { version: 1, fields: [] }) });
+    const existingFields = Array.isArray(t.schema?.fields) ? t.schema.fields : [];
+    setFields(existingFields);
+    reset({ name: t.name, description: t.description ?? '' });
   }
 
   function addField(values: FieldInputs) {
     setError(null);
     try {
-      const current = JSON.parse(getValues('schemaText') || '{}');
-      if (!current || current.version !== 1 || !Array.isArray(current.fields)) {
-        throw new Error('Schema must be an object with version:1 and fields:[]');
-      }
-      const base: any = { id: values.id.trim(), label: values.label.trim(), type: values.type, required: !!values.required };
-      if (!base.id || !base.label) throw new Error('Field id and label are required');
+      const newId = nextFieldId(fields);
+      const base: any = { id: newId, label: values.label.trim(), type: values.type, required: !!values.required };
+      if (!base.label) throw new Error('Field label is required');
       switch (values.type) {
         case 'text':
         case 'textarea':
@@ -103,8 +119,7 @@ export default function AdminItems() {
           // checkbox, date, phone, email, signature-toggle have no extra constraints here
           break;
       }
-      current.fields.push(base);
-      setValue('schemaText', pretty(current), { shouldDirty: true });
+      setFields((prev) => [...prev, base]);
       fieldForm.reset({ type: values.type, required: values.required });
     } catch (e: any) {
       setError(e?.message || 'Invalid schema');
@@ -114,17 +129,16 @@ export default function AdminItems() {
   const onSave = handleSubmit(async (data) => {
     setBusy(true); setError(null);
     try {
-      const schema = JSON.parse(data.schemaText || '{}');
-      if (schema.version !== 1 || !Array.isArray(schema.fields)) throw new Error('Schema must have version:1 and fields:[]');
+      const schema = { version: 1, fields };
       const csrf = getCsrf();
       if (selected) {
-        const res = await fetch(`/api/v1/items/templates/${selected.id}`, {
+        const res = await fetch(`${API_BASE}/api/v1/items/templates/${selected.id}`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, credentials: 'include',
           body: JSON.stringify({ name: data.name, description: data.description || undefined, schema }),
         });
         if (!res.ok) throw new Error('Failed to save');
       } else {
-        const res = await fetch('/api/v1/items/templates', {
+        const res = await fetch(`${API_BASE}/api/v1/items/templates`, {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, credentials: 'include',
           body: JSON.stringify({ name: data.name, description: data.description || undefined, schema }),
         });
@@ -140,8 +154,8 @@ export default function AdminItems() {
 
   async function publish(t: Template) {
     setBusy(true); setError(null);
-    const csrf = getCsrf();
-    const res = await fetch(`/api/v1/items/templates/${t.id}/publish`, { method: 'POST', headers: { 'X-CSRF-Token': csrf }, credentials: 'include' });
+  const csrf = getCsrf();
+  const res = await fetch(`${API_BASE}/api/v1/items/templates/${t.id}/publish`, { method: 'POST', headers: { 'X-CSRF-Token': csrf }, credentials: 'include' });
     if (!res.ok) setError('Publish failed');
     await load();
     setBusy(false);
@@ -149,8 +163,8 @@ export default function AdminItems() {
 
   async function archive(t: Template) {
     setBusy(true); setError(null);
-    const csrf = getCsrf();
-    const res = await fetch(`/api/v1/items/templates/${t.id}`, { method: 'DELETE', headers: { 'X-CSRF-Token': csrf }, credentials: 'include' });
+  const csrf = getCsrf();
+  const res = await fetch(`${API_BASE}/api/v1/items/templates/${t.id}`, { method: 'DELETE', headers: { 'X-CSRF-Token': csrf }, credentials: 'include' });
     if (!res.ok) setError('Archive failed');
     await load();
     setBusy(false);
@@ -201,16 +215,32 @@ export default function AdminItems() {
             <label className="block text-sm">Description</label>
             <input className="w-full rounded border p-2" {...register('description')} />
           </div>
-          <div>
-            <label className="mb-1 block text-sm">Schema (JSON)</label>
-            <textarea className="h-56 w-full rounded border p-2 font-mono text-xs" spellCheck={false} {...register('schemaText', { required: true })} />
+
+          {/* Field builder only; JSON schema is built automatically */}
+          <div className="rounded border p-3">
+            <h3 className="mb-2 font-medium">Fields</h3>
+            {fields.length === 0 ? (
+              <div className="text-sm text-slate-500">No fields yet. Use "Add Field" below.</div>
+            ) : (
+              <ul className="space-y-1">
+                {fields.map((f) => (
+                  <li key={f.id} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
+                    <div>
+                      <span className="font-mono text-xs text-slate-600 mr-2">{f.id}</span>
+                      <span className="font-medium">{f.label}</span>
+                      <span className="ml-2 text-slate-500">({f.type}{f.required ? ', required' : ''})</span>
+                    </div>
+                    <button type="button" className="text-xs text-red-600" onClick={() => setFields((prev)=> prev.filter((x)=> x.id !== f.id))}>Remove</button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <fieldset className="rounded border p-3">
             <legend className="px-1 text-sm font-medium">Add Field</legend>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-              <div><label className="block text-xs">ID</label><input className="w-full rounded border p-1" {...fieldForm.register('id', { required: true })} /></div>
-              <div><label className="block text-xs">Label</label><input className="w-full rounded border p-1" {...fieldForm.register('label', { required: true })} /></div>
+              <div className="md:col-span-1"><label className="block text-xs">Label</label><input className="w-full rounded border p-1" {...fieldForm.register('label', { required: true })} /></div>
               <div>
                 <label className="block text-xs">Type</label>
                 <select className="w-full rounded border p-1" {...fieldForm.register('type')}>{
@@ -226,6 +256,7 @@ export default function AdminItems() {
               <div><label className="block text-xs">max (number)</label><input type="number" className="w-full rounded border p-1" {...fieldForm.register('max', { valueAsNumber: true })} /></div>
               <div className="md:col-span-3"><label className="block text-xs">options (select) value:Label, ...</label><input className="w-full rounded border p-1" placeholder="low:Low,high:High" {...fieldForm.register('options')} /></div>
             </div>
+            <div className="mt-1 text-xs text-slate-500">Field IDs are generated automatically (e.g., field1, field2) and kept unique.</div>
             <div className="mt-2 flex justify-end">
               <button type="button" className="rounded border px-3 py-1 text-sm" onClick={fieldForm.handleSubmit(addField)}>Add</button>
             </div>

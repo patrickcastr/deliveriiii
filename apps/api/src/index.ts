@@ -10,7 +10,6 @@ import { ZodError, z } from 'zod';
 import { PrismaClient, UserRole } from '@prisma/client';
 import { createRedis } from './redis';
 import { Client as ElasticClient } from '@elastic/elasticsearch';
-import type { Health } from '@deliveryapp/shared';
 import { config } from './config';
 import bcrypt from 'bcrypt';
 import { clearAuthCookies, setAuthCookies, signAccess, signRefresh, verifyRefresh } from './auth';
@@ -70,6 +69,20 @@ const app = Fastify({
 // Metrics hooks
 app.addHook('onRequest', onRequestHook);
 app.addHook('onResponse', onResponseHook);
+// Error/response logging for debugging
+app.addHook('onError', async (req, reply, err) => {
+  req.log.error({ err, url: req.url, method: req.method }, 'route error');
+});
+app.addHook('onResponse', async (req, reply) => {
+  req.log.info({ url: req.url, method: req.method, statusCode: reply.statusCode }, 'response');
+});
+// Route error and response logging
+app.addHook('onError', async (req, reply, err) => {
+  req.log.error({ err, url: req.url, method: req.method }, 'route error');
+});
+app.addHook('onResponse', async (req, reply) => {
+  req.log.info({ url: req.url, method: req.method, statusCode: reply.statusCode }, 'response');
+});
 
 // Basic request log summary with correlation id
 app.addHook('onResponse', async (req, reply) => {
@@ -128,12 +141,22 @@ await app.register(v1Attachments, { prefix: '/api/v1' });
 await app.register(v1Requirements, { prefix: '/api/v1' });
 await app.register(v1Items, { prefix: '/api/v1' });
 
-app.get('/healthz', async (): Promise<Health> => {
-  // Lightweight pings (best-effort)
+app.get('/healthz', async (_req, _reply) => {
+  // Lightweight pings (best-effort); do not fail health if deps are down in dev
   try { await redis.ping(); } catch {}
   try { await prisma.$queryRaw`SELECT 1`; } catch {}
   try { await es.ping(); } catch {}
-  return { status: 'ok', ts: new Date().toISOString() };
+  return { ok: true, service: 'api', time: new Date().toISOString() };
+});
+
+app.get('/healthz/db', async (req, reply) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return { ok: true };
+  } catch (e) {
+    req.log.error({ e }, 'db health failed');
+    return reply.code(500).send({ ok: false });
+  }
 });
 
 // Metrics
@@ -333,6 +356,6 @@ io.on('connection', (socket: Socket) => {
   });
 });
 
-app.listen({ port: config.port, host: '0.0.0.0' }).then(() => {
-  app.log.info(`API listening on http://localhost:${config.port}`);
+app.listen({ port: config.port, host: config.host }).then(() => {
+  app.log.info(`API listening on http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}`);
 });

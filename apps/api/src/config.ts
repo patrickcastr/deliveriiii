@@ -4,6 +4,7 @@ export const config = {
   env: process.env.NODE_ENV || 'development',
   isProd: (process.env.NODE_ENV || 'development') === 'production',
   port: Number(process.env.PORT || 3000),
+  host: process.env.HOST || process.env.API_HOST || '0.0.0.0',
   webOrigin:
     process.env.WEB_ORIGIN ||
     process.env.CORS_ORIGIN ||

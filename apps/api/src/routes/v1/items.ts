@@ -80,31 +80,43 @@ export default async function routes(app: FastifyInstance) {
   const db = prisma as any;
   // GET /items/templates?status=draft|published|archived
   app.get('/items/templates', { preHandler: requireAuth('admin') }, async (req: FastifyRequest, reply: FastifyReply) => {
-    const { status } = z.object({ status: z.enum(['draft', 'published', 'archived']).optional() }).parse(req.query);
-    const where = status ? ({ status } as any) : ({} as any);
-    const items = await db.packageItemTemplate.findMany({ where, orderBy: { updatedAt: 'desc' } });
-    return reply.send({ items });
+    try {
+      const { status } = z.object({ status: z.enum(['draft', 'published', 'archived']).default('published') }).parse(req.query ?? {});
+      req.log.info({ status }, 'fetch item templates:start');
+      const where = status ? ({ status } as any) : ({} as any);
+      const items = await db.packageItemTemplate.findMany({ where, orderBy: { updatedAt: 'desc' } });
+      return reply.send({ items });
+    } catch (err) {
+      req.log.error({ err }, 'fetch item templates:error');
+      return reply.code(500).send({ error: 'ITEM_TEMPLATES_FETCH_FAILED' });
+    }
   });
 
   // POST /items/templates — create draft
   app.post('/items/templates', { preHandler: requireAuth('admin') }, async (req: FastifyRequest, reply: FastifyReply) => {
-    const body = z.object({
+    const Body = z.object({
       name: z.string().min(1),
       description: z.string().optional(),
+      status: z.enum(['draft','published','archived']).optional().default('draft'),
       schema: ItemSchemaV1,
-    }).parse(req.body);
-
-    const created = await db.packageItemTemplate.create({
-      data: {
-        name: body.name,
-        description: body.description,
-        status: 'draft',
-        schema: body.schema as any,
-        createdById: req.user!.id,
-      },
     });
-    await db.auditEntry.create({ data: { action: 'item_template_created', userId: req.user!.id, packageId: 'n/a', deviceInfo: {}, newState: created as any } });
-    return reply.code(201).send(created);
+    try {
+      const body = Body.parse(req.body);
+      const created = await db.packageItemTemplate.create({
+        data: {
+          name: body.name,
+          description: body.description,
+          status: body.status,
+          schema: body.schema as any,
+          createdById: req.user!.id,
+        },
+      });
+      await db.auditEntry.create({ data: { action: 'item_template_created', userId: req.user!.id, packageId: 'n/a', deviceInfo: {}, newState: created as any } });
+      return reply.code(201).send(created);
+    } catch (err) {
+      req.log.error({ err }, 'create item template:error');
+      return reply.code(500).send({ error: 'ITEM_TEMPLATE_CREATE_FAILED' });
+    }
   });
 
   // PUT /items/templates/:id — update
